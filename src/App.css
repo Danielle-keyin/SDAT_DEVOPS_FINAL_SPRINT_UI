@@ -1,0 +1,139 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background-color: rgb(27, 27, 113);
+}
+
+h2 {
+  margin: 0.5rem 0 1rem;
+}
+
+/* .page {
+  padding: 1rem;
+} */
+
+.header {
+  border-bottom: 1px solid #ccc;
+}
+
+.header {
+  width: 100%;
+  border-bottom: 1px solid #ccc;
+}
+
+.header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+}
+
+.header-inner.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.footer {
+  width: 100%;
+  border-top: 1px solid #ccc;
+  margin-top: 2rem;
+  opacity: 0.85;
+}
+
+.footer-inner.centered {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem;
+}
+
+.footer-inner {
+  padding: 1rem;
+}
+
+.nav {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-link {
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  border: 1px solid #aaa;
+  color: white;
+  font-weight: 500;
+}
+
+.nav-link.active {
+  font-weight: 700;
+}
+
+.container {
+  display: block;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.airport-selector {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.airport-selector select {
+  padding: 0.4rem 0.6rem;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.flight-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.flight-table th,
+.flight-table td {
+  text-align: left;
+  padding: 0.6rem;
+  border-bottom: 1px solid #ddd;
+  white-space: nowrap;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid #444;
+}
+
+.status-pill.strong {
+  font-weight: 700;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 0.75rem;
+  max-width: 800px;
+  margin-bottom: 0.75rem;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.form-grid input,
+.form-grid select {
+  padding: 0.45rem 0.6rem;
+}
