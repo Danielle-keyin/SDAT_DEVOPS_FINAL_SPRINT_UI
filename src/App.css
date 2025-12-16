@@ -89,6 +89,23 @@ h2 {
   padding: 0.4rem 0.6rem;
 }
 
+.admin-airport-select {
+  margin-bottom: 1rem;
+}
+
+.admin-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.admin-flight-item button {
+  margin-left: 0.25rem;
+}
+
+.admin-flight-item {
+  margin-bottom: 0.5rem;
+}
 .table-wrap {
   overflow-x: auto;
 }

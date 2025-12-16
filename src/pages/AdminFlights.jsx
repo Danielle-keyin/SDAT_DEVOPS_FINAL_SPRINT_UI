@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// src/pages/AdminFlights.jsx
+import { useEffect, useMemo, useState } from "react";
 import {
   getAirports,
   getArrivals,
@@ -19,28 +20,33 @@ const emptyForm = {
   status: "ON_TIME",
 };
 
+const sortByTimeAsc = (a, b) =>
+  new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime();
+
 export default function AdminFlights() {
   const [airports, setAirports] = useState([]);
   const [selectedAirport, setSelectedAirport] = useState("");
   const [flights, setFlights] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   async function refreshFlights(airportId) {
     const arrivals = await getArrivals(airportId);
     const departures = await getDepartures(airportId);
-    setFlights([...arrivals, ...departures]);
+    setFlights([...arrivals, ...departures].slice().sort(sortByTimeAsc));
   }
 
   useEffect(() => {
+    setError("");
     getAirports()
-      .then((data) => {
+      .then(async (data) => {
         setAirports(data);
         if (data.length > 0) {
           const first = data[0].id;
           setSelectedAirport(first);
           setForm((f) => ({ ...f, airportId: first }));
-          return refreshFlights(first);
+          await refreshFlights(first);
         }
       })
       .catch((e) => setError(e.message));
@@ -59,8 +65,11 @@ export default function AdminFlights() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setBusy(true);
 
     try {
+      // ARRIVAL -> destination becomes airportId
+      // DEPARTURE -> origin becomes airportId
       const payload =
         form.type === "ARRIVAL"
           ? { ...form, destination: form.airportId }
@@ -75,34 +84,48 @@ export default function AdminFlights() {
       }));
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleDelete(id) {
     setError("");
+    setBusy(true);
+
     try {
       await deleteFlight(id);
       await refreshFlights(selectedAirport);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
+  const airportName = useMemo(() => {
+    const a = airports.find((x) => String(x.id) === String(selectedAirport));
+    return a?.name || "";
+  }, [airports, selectedAirport]);
+
   return (
-    <div>
+    <div className="admin-page">
       <h1>Admin • Flights</h1>
 
-      {error && <p>{error}</p>}
+      {error && <p className="error">{error}</p>}
 
-      <div style={{ marginBottom: "1rem" }}>
-        <label>
-          Airport:{" "}
+      <div className="admin-airport-select">
+        <label htmlFor="admin-airport">
+          Airport:
           <select
+            id="admin-airport"
             value={selectedAirport}
             onChange={(e) => {
-              setSelectedAirport(e.target.value);
-              setForm((f) => ({ ...f, airportId: e.target.value }));
+              const v = e.target.value;
+              setSelectedAirport(v);
+              setForm((f) => ({ ...f, airportId: v }));
             }}
+            disabled={busy}
           >
             {airports.map((a) => (
               <option key={a.id} value={a.id}>
@@ -111,9 +134,16 @@ export default function AdminFlights() {
             ))}
           </select>
         </label>
+
+        {airportName && (
+          <p className="muted" style={{ marginTop: "0.25rem" }}>
+            Managing flights for: <strong>{airportName}</strong>
+          </p>
+        )}
       </div>
 
       <h2>Add Flight</h2>
+
       <form onSubmit={handleSubmit}>
         <div className="form-grid">
           <label>
@@ -121,6 +151,7 @@ export default function AdminFlights() {
             <select
               value={form.type}
               onChange={(e) => updateField("type", e.target.value)}
+              disabled={busy}
             >
               <option value="ARRIVAL">ARRIVAL</option>
               <option value="DEPARTURE">DEPARTURE</option>
@@ -134,6 +165,7 @@ export default function AdminFlights() {
               onChange={(e) => updateField("flightNumber", e.target.value)}
               placeholder="AC123"
               required
+              disabled={busy}
             />
           </label>
 
@@ -144,6 +176,7 @@ export default function AdminFlights() {
               onChange={(e) => updateField("airline", e.target.value)}
               placeholder="Air Canada"
               required
+              disabled={busy}
             />
           </label>
 
@@ -159,6 +192,7 @@ export default function AdminFlights() {
               }
               placeholder={form.type === "ARRIVAL" ? "YYZ" : "YUL"}
               required
+              disabled={busy}
             />
           </label>
 
@@ -168,6 +202,7 @@ export default function AdminFlights() {
               value={form.gate}
               onChange={(e) => updateField("gate", e.target.value)}
               placeholder="A3"
+              disabled={busy}
             />
           </label>
 
@@ -178,6 +213,7 @@ export default function AdminFlights() {
               value={form.scheduledTime}
               onChange={(e) => updateField("scheduledTime", e.target.value)}
               required
+              disabled={busy}
             />
           </label>
 
@@ -186,6 +222,7 @@ export default function AdminFlights() {
             <select
               value={form.status}
               onChange={(e) => updateField("status", e.target.value)}
+              disabled={busy}
             >
               <option value="ON_TIME">ON_TIME</option>
               <option value="DELAYED">DELAYED</option>
@@ -196,20 +233,40 @@ export default function AdminFlights() {
           </label>
         </div>
 
-        <button type="submit">Add Flight</button>
+        <div className="admin-form-actions">
+          <button type="submit" disabled={busy}>
+            {busy ? "Saving..." : "Add Flight"}
+          </button>
+        </div>
       </form>
 
-      <h2 style={{ marginTop: "1.5rem" }}>Flights (for this airport)</h2>
-      <ul>
-        {flights.map((f) => (
-          <li key={f.id} style={{ marginBottom: "0.5rem" }}>
-            <strong>{f.flightNumber}</strong> • {f.type} • {f.airline} •{" "}
-            {f.type === "ARRIVAL" ? `From ${f.origin}` : `To ${f.destination}`}{" "}
-            • Gate {f.gate || "—"} • {f.status} •{" "}
-            <button onClick={() => handleDelete(f.id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
+      <h2 className="admin-section-title">Flights (for this airport)</h2>
+
+      {flights.length === 0 ? (
+        <p className="muted">No flights found for this airport.</p>
+      ) : (
+        <ul className="admin-flight-list">
+          {flights.map((f) => (
+            <li key={f.id} className="admin-flight-item">
+              <span className="admin-flight-text">
+                <strong>{f.flightNumber}</strong> • {f.type} • {f.airline} •{" "}
+                {f.type === "ARRIVAL"
+                  ? `From ${f.origin}`
+                  : `To ${f.destination}`}{" "}
+                • Gate {f.gate || "—"} • {f.status}
+              </span>
+
+              <button
+                className="danger"
+                onClick={() => handleDelete(f.id)}
+                disabled={busy}
+              >
+                Delete
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
