@@ -11,9 +11,10 @@ export default function AirportSelector({ airports = [], value, onChange }) {
         <option value="" disabled>
           Select an airport...
         </option>
+
         {airports.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
+          <option key={a.id} value={a.code}>
+            {a.name} ({a.code})
           </option>
         ))}
       </select>

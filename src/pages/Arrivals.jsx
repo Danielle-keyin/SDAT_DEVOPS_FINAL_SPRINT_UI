@@ -14,7 +14,7 @@ export default function Arrivals() {
     getAirports()
       .then((data) => {
         setAirports(data);
-        if (data.length > 0) setSelectedAirport(data[0].id);
+        if (data.length > 0) setSelectedAirport(data[0].code); // ✅ change here
       })
       .catch((e) => setError(e.message));
   }, []);

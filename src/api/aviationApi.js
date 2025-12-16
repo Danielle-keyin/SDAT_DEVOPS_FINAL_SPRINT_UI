@@ -3,18 +3,17 @@ import {
   flights as mockFlights,
 } from "../mock/flights";
 
-/**
- * Flip this to true once your Spring Boot API is running.
- */
-const USE_BACKEND = false;
+const USE_BACKEND = true;
 
-// Later: set VITE_API_BASE_URL in .env (http://localhost:8080/api)
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
 
 const delay = (ms = 150) => new Promise((res) => setTimeout(res, ms));
 
-const normalizeAirportId = (airportId) => String(airportId || "").toUpperCase();
+const normalizeAirportCode = (code) =>
+  String(code || "")
+    .trim()
+    .toUpperCase();
 
 const sortByTimeAsc = (a, b) =>
   new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime();
@@ -34,9 +33,7 @@ async function httpJson(path, options = {}) {
     throw new Error(message);
   }
 
-  // 204 No Content
   if (res.status === 204) return null;
-
   return res.json();
 }
 
@@ -45,12 +42,12 @@ async function mockGetAirports() {
   return [...mockAirports];
 }
 
-async function mockGetFlightsByAirportAndType(airportId, type) {
+async function mockGetFlightsByAirportAndType(airportCode, type) {
   await delay();
-  const id = normalizeAirportId(airportId);
+  const code = normalizeAirportCode(airportCode);
 
   return mockFlights
-    .filter((f) => f.airportId === id && f.type === type)
+    .filter((f) => f.airportId === code && f.type === type)
     .slice()
     .sort(sortByTimeAsc);
 }
@@ -62,7 +59,6 @@ async function mockCreateFlight(flight) {
 
   const newFlight = { ...flight, id: nextId };
   mockFlights.push(newFlight);
-
   return newFlight;
 }
 
@@ -79,36 +75,44 @@ async function mockDeleteFlight(flightId) {
   await delay();
   const idx = mockFlights.findIndex((f) => String(f.id) === String(flightId));
   if (idx === -1) throw new Error("Flight not found");
+
   mockFlights.splice(idx, 1);
   return true;
 }
 
-// Airports
 export async function getAirports() {
   if (!USE_BACKEND) return mockGetAirports();
   return httpJson("/airports");
 }
 
-// Arrivals/Departures (by airport)
-export async function getArrivals(airportId) {
-  if (!USE_BACKEND) return mockGetFlightsByAirportAndType(airportId, "ARRIVAL");
-  return httpJson(`/airports/${normalizeAirportId(airportId)}/arrivals`);
-}
-
-export async function getDepartures(airportId) {
+export async function getArrivals(airportCode) {
   if (!USE_BACKEND)
-    return mockGetFlightsByAirportAndType(airportId, "DEPARTURE");
-  return httpJson(`/airports/${normalizeAirportId(airportId)}/departures`);
+    return mockGetFlightsByAirportAndType(airportCode, "ARRIVAL");
+
+  const code = normalizeAirportCode(airportCode);
+  return httpJson(`/airports/${code}/arrivals`);
 }
 
-// Admin – Flights CRUD
-export async function createFlight(flight) {
-  if (!USE_BACKEND) return mockCreateFlight(flight);
-  return httpJson("/flights", { method: "POST", body: JSON.stringify(flight) });
+export async function getDepartures(airportCode) {
+  if (!USE_BACKEND)
+    return mockGetFlightsByAirportAndType(airportCode, "DEPARTURE");
+
+  const code = normalizeAirportCode(airportCode);
+  return httpJson(`/airports/${code}/departures`);
+}
+
+export async function createFlight(flightRequestDto) {
+  if (!USE_BACKEND) return mockCreateFlight(flightRequestDto);
+
+  return httpJson("/flights", {
+    method: "POST",
+    body: JSON.stringify(flightRequestDto),
+  });
 }
 
 export async function updateFlight(flightId, updates) {
   if (!USE_BACKEND) return mockUpdateFlight(flightId, updates);
+
   return httpJson(`/flights/${flightId}`, {
     method: "PUT",
     body: JSON.stringify(updates),
@@ -117,5 +121,6 @@ export async function updateFlight(flightId, updates) {
 
 export async function deleteFlight(flightId) {
   if (!USE_BACKEND) return mockDeleteFlight(flightId);
+
   return httpJson(`/flights/${flightId}`, { method: "DELETE" });
 }
