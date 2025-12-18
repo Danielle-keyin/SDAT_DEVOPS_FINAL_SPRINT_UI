@@ -99,6 +99,13 @@ h2 {
   margin-top: 0.75rem;
 }
 
+.admin-form {
+  background: #b8f3ff;
+  border: 1px solid #ddd;
+  padding: 1rem;
+  border-radius: 8px;
+}
+
 .admin-flight-item button {
   margin-left: 0.25rem;
 }
@@ -106,6 +113,43 @@ h2 {
 .admin-flight-item {
   margin-bottom: 0.5rem;
 }
+
+.admin-flights {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.admin-flights h1 {
+  margin-bottom: 1rem;
+}
+
+.admin-flights h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-flights .error {
+  color: #b00020;
+  background: #ffecec;
+  border: 1px solid #ffb3b3;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.admin-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-hint {
+  font-size: 0.9rem;
+  color: #555;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -153,4 +197,123 @@ h2 {
 .form-grid input,
 .form-grid select {
   padding: 0.45rem 0.6rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.field span {
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+  color: rgb(11, 11, 11);
+}
+
+.field input,
+.field select {
+  padding: 0.45rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 0.9rem;
+}
+
+.field input:disabled,
+.field select:disabled {
+  background: #eee;
+  cursor: not-allowed;
+}
+
+.admin-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.admin-actions button {
+  padding: 0.5rem 0.9rem;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.admin-actions button:first-child {
+  background: #1976d2;
+  color: white;
+}
+
+.admin-actions button:first-child:hover {
+  background: #1565c0;
+}
+
+.admin-actions button:last-child {
+  background: #1b1b71;
+}
+
+.admin-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.section-title {
+  margin-top: 2rem;
+}
+
+.flight-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.flight-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.flight-row:nth-child(even) {
+  background: #321dad;
+}
+
+.flight-info {
+  font-size: 0.9rem;
+}
+
+.flight-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.flight-buttons button {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.flight-buttons button:first-child {
+  background: #ffb300;
+  color: #222;
+}
+
+.flight-buttons button:first-child:hover {
+  background: #ffa000;
+}
+
+.flight-buttons button:last-child {
+  background: #d32f2f;
+  color: white;
+}
+
+.flight-buttons button:last-child:hover {
+  background: #c62828;
+}
+
+.flight-buttons button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

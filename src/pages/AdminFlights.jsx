@@ -1,187 +1,355 @@
-// src/pages/AdminFlights.jsx
 import { useEffect, useMemo, useState } from "react";
 import {
   getAirports,
   getArrivals,
   getDepartures,
   createFlight,
+  updateFlight,
   deleteFlight,
+  getAirlines,
+  getAircraft,
+  getGates,
 } from "../api/aviationApi";
 
 const emptyForm = {
-  airportId: "",
   type: "ARRIVAL",
   flightNumber: "",
-  airline: "",
   origin: "",
   destination: "",
-  gate: "",
   scheduledTime: "",
   status: "ON_TIME",
+  airportId: null,
+  airlineId: null,
+  aircraftId: null,
+  gateId: null,
 };
 
-const sortByTimeAsc = (a, b) =>
-  new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime();
+function toDateTimeLocal(value) {
+  if (!value) return "";
+  const s = String(value);
+  return s.length >= 16 ? s.slice(0, 16) : s;
+}
+
+function getNiceError(err) {
+  const data = err?.response?.data;
+
+  if (typeof data === "string") return data;
+
+  if (data?.message) return data.message;
+  if (data?.error) return `${data.error}${data?.path ? ` (${data.path})` : ""}`;
+
+  if (Array.isArray(data?.errors) && data.errors.length) {
+    return data.errors
+      .map((e) => e.defaultMessage || e.message || String(e))
+      .join(" • ");
+  }
+
+  if (data && typeof data === "object") {
+    const firstKey = Object.keys(data)[0];
+    if (firstKey) return `${firstKey}: ${String(data[firstKey])}`;
+  }
+
+  return err?.message || "Something went wrong. Please try again.";
+}
 
 export default function AdminFlights() {
   const [airports, setAirports] = useState([]);
-  const [selectedAirport, setSelectedAirport] = useState("");
+  const [selectedAirportId, setSelectedAirportId] = useState(null);
+
+  const [airlines, setAirlines] = useState([]);
+  const [aircraft, setAircraft] = useState([]);
+  const [gates, setGates] = useState([]);
+
   const [flights, setFlights] = useState([]);
   const [form, setForm] = useState(emptyForm);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  async function refreshFlights(airportId) {
-    const arrivals = await getArrivals(airportId);
-    const departures = await getDepartures(airportId);
-    setFlights([...arrivals, ...departures].slice().sort(sortByTimeAsc));
+  const [editingId, setEditingId] = useState(null);
+  const isEditing = editingId != null;
+
+  const [error, setError] = useState("");
+  const [loadingFlights, setLoadingFlights] = useState(false);
+  const [loadingAirports, setLoadingAirports] = useState(false);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const selectedAirport = useMemo(
+    () =>
+      airports.find((a) => Number(a.id) === Number(selectedAirportId)) || null,
+    [airports, selectedAirportId]
+  );
+
+  const gatesForSelectedAirport = useMemo(() => gates, [gates]);
+
+  const canSubmit = useMemo(() => {
+    if (!selectedAirport) return false;
+
+    const hasBasics =
+      form.flightNumber.trim() &&
+      form.scheduledTime &&
+      form.type &&
+      form.status;
+
+    const hasRoute =
+      form.type === "ARRIVAL" ? form.origin.trim() : form.destination.trim();
+
+    const hasRequiredDropdowns =
+      form.airportId && form.airlineId && form.aircraftId && form.gateId;
+
+    return Boolean(hasBasics && hasRoute && hasRequiredDropdowns);
+  }, [form, selectedAirport]);
+
+  async function refreshFlightsByAirportCode(airportCode) {
+    setLoadingFlights(true);
+    try {
+      const [arrivals, departures] = await Promise.all([
+        getArrivals(airportCode),
+        getDepartures(airportCode),
+      ]);
+      setFlights([...arrivals, ...departures]);
+    } catch (e) {
+      setError(getNiceError(e));
+    } finally {
+      setLoadingFlights(false);
+    }
   }
 
   useEffect(() => {
-    setError("");
-    getAirports()
-      .then(async (data) => {
-        setAirports(data);
-        if (data.length > 0) {
-          const first = data[0].id;
-          setSelectedAirport(first);
-          setForm((f) => ({ ...f, airportId: first }));
-          await refreshFlights(first);
+    (async () => {
+      try {
+        setError("");
+        setLoadingAirports(true);
+        setLoadingLookups(true);
+
+        const [airportData, airlineData, aircraftData, gateData] =
+          await Promise.all([
+            getAirports(),
+            getAirlines(),
+            getAircraft(),
+            getGates(),
+          ]);
+
+        setAirports(airportData);
+        setAirlines(airlineData);
+        setAircraft(aircraftData);
+        setGates(gateData);
+
+        if (airportData.length > 0) {
+          const first = airportData[0];
+          setSelectedAirportId(first.id);
+
+          setForm((prev) => ({
+            ...prev,
+            airportId: first.id,
+          }));
+
+          await refreshFlightsByAirportCode(first.code);
         }
-      })
-      .catch((e) => setError(e.message));
+      } catch (e) {
+        setError(getNiceError(e));
+      } finally {
+        setLoadingAirports(false);
+        setLoadingLookups(false);
+      }
+    })();
   }, []);
 
   useEffect(() => {
     if (!selectedAirport) return;
+
     setError("");
-    refreshFlights(selectedAirport).catch((e) => setError(e.message));
-  }, [selectedAirport]);
+    setEditingId(null);
+
+    setForm((prev) => ({
+      ...prev,
+      airportId: selectedAirport.id,
+      gateId: null,
+    }));
+
+    refreshFlightsByAirportCode(selectedAirport.code);
+  }, [selectedAirportId]);
 
   function updateField(name, value) {
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
+  function resetToAddMode() {
+    setEditingId(null);
+    setForm((prev) => ({
+      ...emptyForm,
+      type: prev.type,
+      status: prev.status,
+      airportId: selectedAirport?.id ?? prev.airportId,
+    }));
+  }
+
+  function startEdit(f) {
+    setError("");
+    setEditingId(f.id);
+
+    const airportId = selectedAirport?.id ?? f.airportId ?? null;
+
+    setForm({
+      type: f.type || "ARRIVAL",
+      flightNumber: f.flightNumber || "",
+      origin: f.origin || "",
+      destination: f.destination || "",
+      scheduledTime: toDateTimeLocal(f.scheduledTime),
+      status: f.status || "ON_TIME",
+      airportId: airportId,
+      airlineId: f.airlineId ?? null,
+      aircraftId: f.aircraftId ?? null,
+      gateId: f.gateId ?? null,
+    });
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
-    setBusy(true);
+
+    if (!selectedAirport) {
+      setError("Select an airport first.");
+      return;
+    }
+
+    if (
+      !form.airportId ||
+      !form.airlineId ||
+      !form.aircraftId ||
+      !form.gateId
+    ) {
+      setError("Pick Airline, Aircraft, and Gate (all required).");
+      return;
+    }
 
     try {
-      // ARRIVAL -> destination becomes airportId
-      // DEPARTURE -> origin becomes airportId
-      const payload =
-        form.type === "ARRIVAL"
-          ? { ...form, destination: form.airportId }
-          : { ...form, origin: form.airportId };
+      setSaving(true);
 
-      await createFlight(payload);
-      await refreshFlights(selectedAirport);
+      const airportCode = selectedAirport.code;
 
-      setForm((prev) => ({
-        ...emptyForm,
-        airportId: prev.airportId,
-      }));
+      const payload = {
+        flightNumber: form.flightNumber,
+        type: form.type,
+        status: form.status,
+        scheduledTime: form.scheduledTime,
+
+        origin: form.type === "ARRIVAL" ? form.origin : airportCode,
+        destination: form.type === "ARRIVAL" ? airportCode : form.destination,
+
+        airportId: Number(form.airportId),
+        airlineId: Number(form.airlineId),
+        aircraftId: Number(form.aircraftId),
+        gateId: Number(form.gateId),
+      };
+
+      if (isEditing) {
+        await updateFlight(editingId, payload);
+      } else {
+        await createFlight(payload);
+      }
+
+      await refreshFlightsByAirportCode(airportCode);
+      resetToAddMode();
     } catch (err) {
-      setError(err.message);
+      setError(getNiceError(err));
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id, flightNumber) {
     setError("");
-    setBusy(true);
+    if (!selectedAirport) return;
+
+    const ok = window.confirm(`Delete flight ${flightNumber || id}?`);
+    if (!ok) return;
 
     try {
+      if (Number(id) === Number(editingId)) resetToAddMode();
+
       await deleteFlight(id);
-      await refreshFlights(selectedAirport);
+      await refreshFlightsByAirportCode(selectedAirport.code);
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
+      setError(getNiceError(err));
     }
   }
-
-  const airportName = useMemo(() => {
-    const a = airports.find((x) => String(x.id) === String(selectedAirport));
-    return a?.name || "";
-  }, [airports, selectedAirport]);
 
   return (
-    <div className="admin-page">
+    <div className="admin-flights">
       <h1>Admin • Flights</h1>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error-banner">{error}</p>}
 
-      <div className="admin-airport-select">
-        <label htmlFor="admin-airport">
-          Airport:
+      <div className="admin-controls">
+        <label className="field">
+          <span>Airport</span>
           <select
-            id="admin-airport"
-            value={selectedAirport}
-            onChange={(e) => {
-              const v = e.target.value;
-              setSelectedAirport(v);
-              setForm((f) => ({ ...f, airportId: v }));
-            }}
-            disabled={busy}
+            value={selectedAirportId || ""}
+            onChange={(e) => setSelectedAirportId(e.target.value)}
+            disabled={loadingAirports}
           >
             {airports.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name}
+                {a.name} ({a.code})
               </option>
             ))}
           </select>
         </label>
 
-        {airportName && (
-          <p className="muted" style={{ marginTop: "0.25rem" }}>
-            Managing flights for: <strong>{airportName}</strong>
+        {loadingAirports && <p className="muted">Loading airports…</p>}
+
+        {selectedAirport && !loadingAirports && (
+          <p className="muted">
+            Showing flights for: <strong>{selectedAirport.name}</strong>
           </p>
         )}
       </div>
 
-      <h2>Add Flight</h2>
+      <h2>{isEditing ? "Edit Flight" : "Add Flight"}</h2>
 
-      <form onSubmit={handleSubmit}>
+      <form className="admin-form" onSubmit={handleSubmit}>
         <div className="form-grid">
-          <label>
-            Type
+          <label className="field">
+            <span>Type</span>
             <select
               value={form.type}
               onChange={(e) => updateField("type", e.target.value)}
-              disabled={busy}
             >
               <option value="ARRIVAL">ARRIVAL</option>
               <option value="DEPARTURE">DEPARTURE</option>
             </select>
           </label>
 
-          <label>
-            Flight #
+          <label className="field">
+            <span>Flight #</span>
             <input
               value={form.flightNumber}
               onChange={(e) => updateField("flightNumber", e.target.value)}
               placeholder="AC123"
               required
-              disabled={busy}
             />
           </label>
 
-          <label>
-            Airline
-            <input
-              value={form.airline}
-              onChange={(e) => updateField("airline", e.target.value)}
-              placeholder="Air Canada"
+          <label className="field">
+            <span>Airline</span>
+            <select
+              value={form.airlineId ?? ""}
+              onChange={(e) => updateField("airlineId", e.target.value)}
               required
-              disabled={busy}
-            />
+              disabled={loadingLookups}
+            >
+              <option value="" disabled>
+                Select airline…
+              </option>
+              {airlines.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.code})
+                </option>
+              ))}
+            </select>
           </label>
 
-          <label>
-            {form.type === "ARRIVAL" ? "Origin" : "Destination"}
+          <label className="field">
+            <span>{form.type === "ARRIVAL" ? "Origin" : "Destination"}</span>
             <input
               value={form.type === "ARRIVAL" ? form.origin : form.destination}
               onChange={(e) =>
@@ -192,37 +360,69 @@ export default function AdminFlights() {
               }
               placeholder={form.type === "ARRIVAL" ? "YYZ" : "YUL"}
               required
-              disabled={busy}
             />
           </label>
 
-          <label>
-            Gate
-            <input
-              value={form.gate}
-              onChange={(e) => updateField("gate", e.target.value)}
-              placeholder="A3"
-              disabled={busy}
-            />
+          <label className="field">
+            <span>Aircraft</span>
+            <select
+              value={form.aircraftId ?? ""}
+              onChange={(e) => updateField("aircraftId", e.target.value)}
+              required
+              disabled={loadingLookups}
+            >
+              <option value="" disabled>
+                Select aircraft…
+              </option>
+              {aircraft.map((ac) => (
+                <option key={ac.id} value={ac.id}>
+                  {ac.model} {ac.registration ? `(${ac.registration})` : ""}
+                </option>
+              ))}
+            </select>
           </label>
 
-          <label>
-            Scheduled Time
+          <label className="field">
+            <span>Gate</span>
+            <select
+              value={form.gateId ?? ""}
+              onChange={(e) => updateField("gateId", e.target.value)}
+              required
+              disabled={loadingLookups || gatesForSelectedAirport.length === 0}
+            >
+              <option value="" disabled>
+                {loadingLookups ? "Loading gates…" : "Select gate…"}
+              </option>
+              {gatesForSelectedAirport.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.gateNumber}
+                </option>
+              ))}
+            </select>
+
+            {/* Empty state for gates */}
+            {form.airportId &&
+              !loadingLookups &&
+              gatesForSelectedAirport.length === 0 && (
+                <p className="muted">No gates available for this airport.</p>
+              )}
+          </label>
+
+          <label className="field">
+            <span>Scheduled Time</span>
             <input
               type="datetime-local"
               value={form.scheduledTime}
               onChange={(e) => updateField("scheduledTime", e.target.value)}
               required
-              disabled={busy}
             />
           </label>
 
-          <label>
-            Status
+          <label className="field">
+            <span>Status</span>
             <select
               value={form.status}
               onChange={(e) => updateField("status", e.target.value)}
-              disabled={busy}
             >
               <option value="ON_TIME">ON_TIME</option>
               <option value="DELAYED">DELAYED</option>
@@ -233,40 +433,53 @@ export default function AdminFlights() {
           </label>
         </div>
 
-        <div className="admin-form-actions">
-          <button type="submit" disabled={busy}>
-            {busy ? "Saving..." : "Add Flight"}
+        <div className="admin-actions">
+          <button type="submit" disabled={saving || !canSubmit}>
+            {saving ? "Saving..." : isEditing ? "Update Flight" : "Add Flight"}
           </button>
+
+          {isEditing && (
+            <button
+              type="button"
+              className="secondary"
+              onClick={resetToAddMode}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+          )}
         </div>
+
+        {!canSubmit && <p className="muted" style={{ marginTop: 8 }}></p>}
       </form>
 
-      <h2 className="admin-section-title">Flights (for this airport)</h2>
+      <h2 className="section-title">Flights (for this airport)</h2>
 
-      {flights.length === 0 ? (
-        <p className="muted">No flights found for this airport.</p>
-      ) : (
-        <ul className="admin-flight-list">
-          {flights.map((f) => (
-            <li key={f.id} className="admin-flight-item">
-              <span className="admin-flight-text">
-                <strong>{f.flightNumber}</strong> • {f.type} • {f.airline} •{" "}
-                {f.type === "ARRIVAL"
-                  ? `From ${f.origin}`
-                  : `To ${f.destination}`}{" "}
-                • Gate {f.gate || "—"} • {f.status}
-              </span>
+      {loadingFlights && <p>Loading flights…</p>}
 
-              <button
-                className="danger"
-                onClick={() => handleDelete(f.id)}
-                disabled={busy}
-              >
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
+      {/* Empty state for flights */}
+      {!loadingFlights && flights.length === 0 && (
+        <p className="muted">No flights found for this airport yet.</p>
       )}
+
+      <ul className="flight-list">
+        {flights.map((f) => (
+          <li key={f.id} className="flight-row">
+            <strong>{f.flightNumber}</strong> • {f.type} • {f.airline} •{" "}
+            {f.type === "ARRIVAL" ? `From ${f.origin}` : `To ${f.destination}`}{" "}
+            • Gate {f.gate || "—"} • {f.status}{" "}
+            <button className="secondary" onClick={() => startEdit(f)}>
+              Edit
+            </button>{" "}
+            <button
+              className="danger"
+              onClick={() => handleDelete(f.id, f.flightNumber)}
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

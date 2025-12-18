@@ -85,6 +85,25 @@ export async function getAirports() {
   return httpJson("/airports");
 }
 
+export async function createAirport(airport) {
+  return httpJson("/airports", {
+    method: "POST",
+    body: JSON.stringify(airport),
+  });
+}
+
+export async function updateAirport(id, airport) {
+  return httpJson(`/airports/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(airport),
+  });
+}
+
+export async function deleteAirport(id) {
+  return httpJson(`/airports/${id}`, { method: "DELETE" });
+}
+/* ✅ END NEW */
+
 export async function getArrivals(airportCode) {
   if (!USE_BACKEND)
     return mockGetFlightsByAirportAndType(airportCode, "ARRIVAL");
@@ -123,4 +142,21 @@ export async function deleteFlight(flightId) {
   if (!USE_BACKEND) return mockDeleteFlight(flightId);
 
   return httpJson(`/flights/${flightId}`, { method: "DELETE" });
+}
+
+export async function getAirlines() {
+  return httpJson("/airlines");
+}
+
+export async function getAircraft() {
+  return httpJson("/aircraft");
+}
+
+export async function getGatesByAirportCode(airportCode) {
+  const code = normalizeAirportCode(airportCode);
+  return httpJson(`/airports/${code}/gates`);
+}
+
+export async function getGates() {
+  return httpJson("/gates");
 }
